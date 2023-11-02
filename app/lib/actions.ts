@@ -13,10 +13,13 @@ const InvoiceSchema = z.object({
 	date: z.string(),
 });
 
-const CreateInvoice = InvoiceSchema.omit({ id: true, date: true });;
+const CreateInvoice = InvoiceSchema.omit({ id: true, date: true });
+const DeleteInvoice = InvoiceSchema.pick({ id: true });
+const UpdateInvoice = InvoiceSchema.omit({ date: true });
 
 export async function createInvoice(formData: FormData) {
-	const {customerId, amount, status } = CreateInvoice.parse({
+	try {
+		const {customerId, amount, status } = CreateInvoice.parse({
 		customerId: formData.get('customerId'),
 		amount: formData.get('amount'),
 		status: formData.get('status'),
@@ -29,7 +32,53 @@ export async function createInvoice(formData: FormData) {
     INSERT INTO invoices (customer_id, amount, status, date)
     VALUES (${customerId}, ${amountInCents}, ${status}, ${date});
 	`
+	} catch (error) {
+		console.log("Error with createInvoice", error)
+		return {
+			message: 'Error: shit broke when creating invoice.'
+		}
+	}
 
 	revalidatePath('/dashboard/invoices');
 	redirect('/dashboard/invoices');
+}
+
+export async function updateInvoice(formData: FormData) {
+	try {
+		const { id, customerId, amount, status } = UpdateInvoice.parse({
+			id: formData.get('id'),
+			customerId: formData.get('customerId'),
+			amount: formData.get('amount'),
+			status: formData.get('status'),
+		});
+
+		const amountInCents = amount * 100;
+
+		await sql`
+	    UPDATE invoices
+	    SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
+	    WHERE id = ${id}
+	  `;
+	} catch (error) {
+		console.log("Error with updateInvoice", error)
+		return {
+			message: 'Error: shit broke when updating invoice.'
+		}
+	}
+
+	revalidatePath('/dashboard/invoices');
+	redirect('/dashboard/invoices');
+}
+
+export async function deleteInvoice(formData: FormData) {
+	try {
+		const id = formData.get('id')?.toString();
+		await sql`DELETE FROM invoices WHERE id = ${id}`;
+		revalidatePath('/dashboard/invoices');
+	} catch (error) {
+		console.log("Error with deleteInvoice", error)
+		return {
+			message: 'Error: shit broke when deleting invoice.'
+		}
+	}
 }
